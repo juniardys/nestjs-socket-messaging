@@ -4,16 +4,18 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { LoginDto } from './dtos/login.dto';
+import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from '../user/user.repository';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from 'src/shared/config/config.service';
 import * as timestring from 'timestring';
 import * as dayjs from 'dayjs';
-import { RegisterDto } from './dtos/register.dto';
-import { RegisterResponseDto } from './dtos/response/register-response.dto';
-import { serialize } from 'v8';
+import { RegisterDto } from './dto/register.dto';
+import { User } from 'src/schemas/user.schema';
+import { Socket } from 'socket.io';
+import { WsException } from '@nestjs/websockets';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +23,7 @@ export class AuthService {
     private userRepository: UserRepository,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private userService: UserService,
   ) {}
 
   async login(data: LoginDto) {
@@ -34,7 +37,7 @@ export class AuthService {
 
     const expiresIn = this.configService.jwtConfig.expiry;
     const expiresInSeconds = timestring(expiresIn);
-    const expiredAt = dayjs().add(expiresInSeconds, 's');
+    const expiredAt = dayjs().add(expiresInSeconds, 's').toDate();
     const payload = { id: user._id };
 
     return {
@@ -44,7 +47,7 @@ export class AuthService {
     };
   }
 
-  async register(data: RegisterDto): Promise<RegisterResponseDto> {
+  async register(data: RegisterDto): Promise<User> {
     const registeredUser = await this.userRepository.findByEmail(data.email);
     if (registeredUser) {
       throw new HttpException('Already registered!', HttpStatus.FOUND);
@@ -56,9 +59,31 @@ export class AuthService {
       password: pass,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...responseUser } = createdUser._doc;
+    return createdUser;
+  }
 
-    return new RegisterResponseDto(responseUser);
+  async me(user: User): Promise<User> {
+    return user;
+  }
+
+  async getUserFromAuthenticationToken(token: string): Promise<User> {
+    if (!token) throw new WsException('Invalid Credentials.');
+    try {
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: this.configService.jwtConfig.secret,
+      });
+      return this.userService.getUserById(payload.id);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async getUserFromSocket(socket: Socket) {
+    const token = socket.handshake.headers.authorization;
+    const user = await this.getUserFromAuthenticationToken(token);
+    if (!user) {
+      throw new WsException('Invalid credentials.');
+    }
+    return user;
   }
 }

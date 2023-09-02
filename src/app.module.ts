@@ -7,6 +7,7 @@ import { UserModule } from './app/user/user.module';
 import { AuthModule } from './app/auth/auth.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigService } from './shared/config/config.service';
+import { ChatRoomModule } from './app/chat-room/chat-room.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ConfigService } from './shared/config/config.service';
     ChatModule,
     UserModule,
     AuthModule,
+    ChatRoomModule,
   ],
   controllers: [AppController],
   providers: [AppService],

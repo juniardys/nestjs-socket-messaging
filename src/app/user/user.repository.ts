@@ -8,12 +8,15 @@ import { CreateUserDto } from './dtos/CreateUserDto';
 export class UserRepository {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
+  async findById(id: string): Promise<User> {
+    return this.userModel.findById(id);
+  }
+
   async findByEmail(email: string): Promise<User> {
     return this.userModel.findOne({ email });
   }
 
   async create(data: CreateUserDto): Promise<User> {
-    const created = new this.userModel(data);
-    return created.save();
+    return new this.userModel(data).save();
   }
 }
